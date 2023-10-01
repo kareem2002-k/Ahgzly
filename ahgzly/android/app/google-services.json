@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1072224863257",
+    "project_id": "ahgzly-80c51",
+    "storage_bucket": "ahgzly-80c51.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1072224863257:android:6cd352010c9d887d831688",
+        "android_client_info": {
+          "package_name": "com.example.ahgzly"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC44K-o1uQ5EE1TKndGoS1RYRhvNU5zfjs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
