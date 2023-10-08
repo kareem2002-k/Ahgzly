@@ -1,7 +1,8 @@
+// ignore: file_names
 import 'package:flutter/material.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:geocoding/geocoding.dart';
+import 'package:ahgzly/widgets/SportButton.dart';
+import 'package:ahgzly/services/LocationService.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({Key? key}) : super(key: key);
@@ -15,6 +16,7 @@ class _HomePageState extends State<HomePage> {
   String selectedSport = '';
   TextEditingController searchController = TextEditingController();
   String location = '';
+  LocationService locationService = LocationService();
 
   @override
   void initState() {
@@ -32,29 +34,22 @@ class _HomePageState extends State<HomePage> {
   Future<void> _requestLocationPermission() async {
     final status = await Permission.location.request();
     if (status.isGranted) {
-      // Location permission granted, fetch the user's current location
-      _getCurrentLocation();
+      try {
+        final currentLocation = await locationService.getCurrentLocation();
+        setState(() {
+          location = currentLocation;
+        });
+      } catch (e) {
+        print(e);
+        setState(() {
+          location = 'Location not found';
+        });
+      }
     } else {
       // Location permission denied, handle it as needed
       setState(() {
         location = 'Location permission denied';
       });
-    }
-  }
-
-  Future<void> _getCurrentLocation() async {
-    try {
-      Position position = await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.medium);
-      List<Placemark> placemarks =
-          await placemarkFromCoordinates(position.latitude, position.longitude);
-      Placemark placemark = placemarks[0];
-      setState(() {
-        location = '${placemark.locality}, ${placemark.country}';
-      });
-    } catch (e) {
-      // ignore: avoid_print
-      print(e);
     }
   }
 
@@ -100,13 +95,15 @@ class _HomePageState extends State<HomePage> {
                         // Add notification icon's functionality here
                       },
                       icon: const Icon(
-                        Icons.notifications,
+                        Icons.notifications_none_outlined,
                         color: Colors.black,
                       ),
                     ),
                   ],
                 ),
               ),
+              const SizedBox(
+                  height: 16), // Add space between the search bar and buttons
               Container(
                 width: double.infinity,
                 height: 51.31,
@@ -133,6 +130,8 @@ class _HomePageState extends State<HomePage> {
                     Expanded(
                       child: TextField(
                         controller: searchController,
+                        style:
+                            const TextStyle(fontSize: 16), // Increase font size
                         decoration: const InputDecoration(
                           hintText: 'Search address, or near you',
                           border: InputBorder.none,
@@ -143,23 +142,23 @@ class _HomePageState extends State<HomePage> {
                   ],
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Wrap(
-                  spacing: 16.0,
-                  runSpacing: 8.0,
+              const SizedBox(
+                  height: 16), // Add space between the search bar and buttons
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
                   children: [
-                    SportToggleButton(
+                    SportButton(
                       label: 'Sport 1',
                       selected: selectedSport == 'Sport 1',
                       onPressed: () => toggleSport('Sport 1'),
                     ),
-                    SportToggleButton(
+                    SportButton(
                       label: 'Sport 2',
                       selected: selectedSport == 'Sport 2',
                       onPressed: () => toggleSport('Sport 2'),
                     ),
-                    SportToggleButton(
+                    SportButton(
                       label: 'Sport 3',
                       selected: selectedSport == 'Sport 3',
                       onPressed: () => toggleSport('Sport 3'),
@@ -170,6 +169,8 @@ class _HomePageState extends State<HomePage> {
               if (selectedSport.isNotEmpty)
                 Container(
                   padding: const EdgeInsets.all(16),
+                  margin:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   color: Colors.green,
                   child: Text(
                     'Selected Sport: $selectedSport',
@@ -190,38 +191,5 @@ class _HomePageState extends State<HomePage> {
     setState(() {
       selectedSport = selectedSport == sport ? '' : sport;
     });
-  }
-}
-
-class SportToggleButton extends StatelessWidget {
-  final String label;
-  final bool selected;
-  final VoidCallback onPressed;
-
-  // ignore: use_key_in_widget_constructors
-  const SportToggleButton({
-    required this.label,
-    required this.selected,
-    required this.onPressed,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return ElevatedButton(
-      onPressed: onPressed,
-      style: ElevatedButton.styleFrom(
-        foregroundColor: selected ? Colors.white : Colors.green,
-        backgroundColor: selected ? Colors.green : Colors.white,
-        padding: const EdgeInsets.all(16),
-        side: const BorderSide(
-          color: Colors.green,
-          width: 2.0,
-        ),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(24),
-        ),
-      ),
-      child: Text(label),
-    );
   }
 }
