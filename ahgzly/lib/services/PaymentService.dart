@@ -1,5 +1,7 @@
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:ahgzly/models/AuthenticationResponse.dart';
+import 'package:ahgzly/models/PaymentResult.dart';
 
 class PaymentService {
   // ignore: constant_identifier_names
@@ -19,6 +21,7 @@ class PaymentService {
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         final token = data['token'] as String;
+        // ignore: unnecessary_null_comparison
         if (token != null) {
           return AuthenticationResponse(token: token);
         } else {
@@ -90,18 +93,4 @@ class PaymentService {
       throw Exception('Error during authentication: $e');
     }
   }
-}
-
-class PaymentResult {
-  final bool? success;
-  final String? token;
-  final String? orderId;
-
-  PaymentResult({this.success, this.token, this.orderId});
-}
-
-class AuthenticationResponse {
-  final String token;
-
-  AuthenticationResponse({required this.token});
 }
