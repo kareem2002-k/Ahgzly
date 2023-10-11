@@ -1,6 +1,9 @@
 // ignore: file_names
+import 'package:ahgzly/services/PaymentService.dart';
 import 'package:flutter/material.dart';
 import 'package:ahgzly/models/Court.dart';
+import 'package:ahgzly/models/PaymentResult.dart';
+import 'package:ahgzly/pages/PaymentPage.dart';
 
 class CourtDetailPage extends StatelessWidget {
   final Court court;
@@ -59,8 +62,31 @@ class CourtDetailPage extends StatelessWidget {
       bottomNavigationBar: Container(
         padding: const EdgeInsets.all(16),
         child: ElevatedButton(
-          onPressed: () {
-            // Add reservation functionality here
+          onPressed: () async {
+            try {
+              PaymentResult? resp =
+                  await PaymentService().createPaymentKey(amount: "200");
+
+              if (resp != null && resp.success != null) {
+                // Navigate to the reservations page
+                Navigator.of(context).push(MaterialPageRoute(
+                  builder: (context) => PaymentPage(
+                    paymentResult: resp,
+                  ),
+                ));
+              } else {
+                // Handle the case where resp or resp.success is null
+                print('Payment response or success is null');
+              }
+            } catch (e) {
+              // Handle any exceptions that might occur during payment processing
+              print('Payment failed. Exception: $e');
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Payment failed. Please try again later.'),
+                ),
+              );
+            }
           },
           child: const Text('Reservations'),
         ),

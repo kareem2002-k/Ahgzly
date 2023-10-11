@@ -4,34 +4,37 @@ import 'package:ahgzly/models/AuthenticationResponse.dart';
 import 'package:ahgzly/models/PaymentResult.dart';
 
 class PaymentService {
-  // ignore: constant_identifier_names
   static const String api_key =
-      'ZXlKaGJHY2lPaUpJVXpVeE1pSXNJblI1Y0NJNklrcFhWQ0o5LmV5SmpiR0Z6Y3lJNklrMWxjbU5vWVc1MElpd2ljSEp2Wm1sc1pWOXdheUk2T1RJd016VTRMQ0p1WVcxbElqb2lNVFk1TnpBME5UYzBOeTQwTVRrM055SjkuZWZEa2VTTVlZSEZyQjRGZjc2SDBNN0FsY05KRVQ3aWxfVWUyXzBHY21ncUdFaG5jRmVHUHhGMm5iQk5SdXBvcTEwUmgyNWtBd1JrMG1tOXduMG9VaVE=';
+      'ZXlKaGJHY2lPaUpJVXpVeE1pSXNJblI1Y0NJNklrcFhWQ0o5LmV5SmpiR0Z6Y3lJNklrMWxjbU5vWVc1MElpd2ljSEp2Wm1sc1pWOXdheUk2T1RJd016VTRMQ0p1WVcxbElqb2lhVzVwZEdsaGJDSjkueEdkZWN2ZkZaSEpDVm5mb3lyOElxRmVGM0lhUVVtTjk4U2VTUTlvMXRnQkNiR18xenNNWExQcGJqYWVONnN4UHUzMzVkS1QzLVFob2FScFAtNFM2Z2c=';
+  // Replace with your API key
   static const String baseUrl = 'https://accept.paymob.com/api';
 
   Future<AuthenticationResponse> authenticate() async {
     try {
-      final url = Uri.parse('$baseUrl/auth/tokens');
-      final body = json.encode({
-        'api_key': api_key,
-      });
+      final url = Uri.https('accept.paymob.com', '/api/auth/tokens');
 
-      final response = await http.post(url, body: body);
+      final response = await http.post(url, body: {
+        "api_key": api_key,
+      });
+      print('i reached here');
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         final token = data['token'] as String;
-        // ignore: unnecessary_null_comparison
+        print('this works fine');
+
         if (token != null) {
           return AuthenticationResponse(token: token);
         } else {
           throw Exception('Token not found in the response');
         }
       } else {
+        // Handle other status codes (e.g., 400 Bad Request, 401 Unauthorized, etc.)
         throw Exception(
             'Failed to authenticate. Status code: ${response.statusCode}');
       }
     } catch (e) {
+      // Handle network-related errors, timeouts, or unexpected exceptions
       throw Exception('Error during authentication: $e');
     }
   }
@@ -44,10 +47,17 @@ class PaymentService {
       final body = json.encode({
         "auth_token": token,
         "delivery_needed": "false",
-        "amount_cents": "100",
+        "amount_cents": amount * 100,
         "currency": "EGP",
         "merchant_order_id": 5,
-        "items": [],
+        "items": [
+          {
+            "name": "ASCIS",
+            "amount_cents": amount * 100,
+            "description": "ASCIS",
+            "quantity": 1
+          }
+        ],
         "shipping_data": {
           "apartment": "803",
           "email": "claudette09@exa.com",
@@ -76,15 +86,65 @@ class PaymentService {
       });
 
       final response = await http.post(url, body: body);
+      print('i reached here');
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         final order = data['id'];
+        print('i reached and here');
+
         return PaymentResult(
-          success: true,
-          token: token,
-          orderId: order,
-        );
+            success: true, token: token, orderId: order, paymentKey: null);
+      } else {
+        throw Exception(
+            'Failed to authenticate. Status code: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error during authentication: $e');
+    }
+  }
+
+  Future<PaymentResult> createPaymentKey({required String amount}) async {
+    try {
+      final resultOfOrder = await createOrder(amount: '100');
+      final token = resultOfOrder.token;
+      final orderId = resultOfOrder.orderId;
+      final url = Uri.parse('$baseUrl/acceptance/payment_keys');
+      final body = json.encode({
+        "auth_token": token,
+        "amount_cents": amount * 100,
+        "expiration": 3600,
+        "order_id": "103",
+        "billing_data": {
+          "apartment": "803",
+          "email": "claudette09@exa.com",
+          "floor": "42",
+          "first_name": "Clifford",
+          "street": "Ethan Land",
+          "building": "8028",
+          "phone_number": "+86(8)9135210487",
+          "shipping_method": "PKG",
+          "postal_code": "01898",
+          "city": "Jaskolskiburgh",
+          "country": "CR",
+          "last_name": "Nicolas",
+          "state": "Utah"
+        },
+        "currency": "EGP",
+        "integration_id": 1,
+        "lock_order_when_paid": "false"
+      });
+
+      final response = await http.post(url, body: body);
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final paymentKey = data['token'];
+        return PaymentResult(
+            success: true,
+            token: token,
+            orderId: orderId,
+            paymentKey: paymentKey);
       } else {
         throw Exception(
             'Failed to authenticate. Status code: ${response.statusCode}');
