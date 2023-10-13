@@ -1,156 +1,115 @@
-import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:dio/dio.dart';
 import 'package:ahgzly/models/AuthenticationResponse.dart';
 import 'package:ahgzly/models/PaymentResult.dart';
 
 class PaymentService {
-  static const String api_key =
-      'ZXlKaGJHY2lPaUpJVXpVeE1pSXNJblI1Y0NJNklrcFhWQ0o5LmV5SmpiR0Z6Y3lJNklrMWxjbU5vWVc1MElpd2ljSEp2Wm1sc1pWOXdheUk2T1RJd016VTRMQ0p1WVcxbElqb2lhVzVwZEdsaGJDSjkueEdkZWN2ZkZaSEpDVm5mb3lyOElxRmVGM0lhUVVtTjk4U2VTUTlvMXRnQkNiR18xenNNWExQcGJqYWVONnN4UHUzMzVkS1QzLVFob2FScFAtNFM2Z2c=';
-  // Replace with your API key
-  static const String baseUrl = 'https://accept.paymob.com/api';
+  final Dio dio = Dio();
+  final String apiKey =
+      'ZXlKaGJHY2lPaUpJVXpVeE1pSXNJblI1Y0NJNklrcFhWQ0o5LmV5SmpiR0Z6Y3lJNklrMWxjbU5vWVc1MElpd2ljSEp2Wm1sc1pWOXdheUk2T1RJd016VTRMQ0p1WVcxbElqb2lNVFk1TnpJeE5qUTNNaTQ1TkRZek1EWWlmUS5CRlpKZHhJOWZvbjJWNGpycVMwT3QzbHdwaE5kYkh4eDZ4a2twTnJaV3pUNXM3WnFDanRmTzYzR1Ixdk52ZldrRFkxbFRtM0dVS3k2Z1JramEzSlpXZw==';
 
   Future<AuthenticationResponse> authenticate() async {
     try {
-      final url = Uri.https('accept.paymob.com', '/api/auth/tokens');
+      final response = await dio.post(
+          'https://accept.paymob.com/api/auth/tokens',
+          data: {"api_key": apiKey});
 
-      final response = await http.post(url, body: {
-        "api_key": api_key,
-      });
-      print('i reached here');
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
+      if (response.statusCode! >= 200 && response.statusCode! < 300) {
+        final data = response.data as Map<String, dynamic>;
         final token = data['token'] as String;
-        print('this works fine');
 
-        if (token != null) {
-          return AuthenticationResponse(token: token);
-        } else {
+        if (token == null) {
           throw Exception('Token not found in the response');
         }
+
+        return AuthenticationResponse(token: token);
       } else {
-        // Handle other status codes (e.g., 400 Bad Request, 401 Unauthorized, etc.)
         throw Exception(
             'Failed to authenticate. Status code: ${response.statusCode}');
       }
     } catch (e) {
-      // Handle network-related errors, timeouts, or unexpected exceptions
       throw Exception('Error during authentication: $e');
     }
   }
 
-  Future<PaymentResult> createOrder({required String amount}) async {
+  Future<PaymentResult> createOrder({
+    required String amountCents,
+    String currency = 'EGP',
+  }) async {
     try {
       final validatetok = await authenticate();
       final token = validatetok.token;
-      final url = Uri.parse('$baseUrl/ecommerce/orders');
-      final body = json.encode({
+
+      final body = {
         "auth_token": token,
         "delivery_needed": "false",
-        "amount_cents": amount * 100,
-        "currency": "EGP",
-        "merchant_order_id": 5,
-        "items": [
-          {
-            "name": "ASCIS",
-            "amount_cents": amount * 100,
-            "description": "ASCIS",
-            "quantity": 1
-          }
-        ],
-        "shipping_data": {
-          "apartment": "803",
-          "email": "claudette09@exa.com",
-          "floor": "42",
-          "first_name": "Clifford",
-          "street": "Ethan Land",
-          "building": "8028",
-          "phone_number": "+86(8)9135210487",
-          "postal_code": "01898",
-          "extra_description": "8 Ram , 128 Giga",
-          "city": "Jaskolskiburgh",
-          "country": "CR",
-          "last_name": "Nicolas",
-          "state": "Utah"
-        },
-        "shipping_details": {
-          "notes": " test",
-          "number_of_packages": 1,
-          "weight": 1,
-          "weight_unit": "Kilogram",
-          "length": 1,
-          "width": 1,
-          "height": 1,
-          "contents": "product of some sorts"
-        }
-      });
+        "amount_cents": amountCents,
+        "currency": currency,
+        "items": [],
+      };
 
-      final response = await http.post(url, body: body);
-      print('i reached here');
+      final response = await dio.post(
+        'https://accept.paymob.com/api/ecommerce/orders',
+        data: body,
+      );
 
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final order = data['id'];
-        print('i reached and here');
+      if (response.statusCode! >= 200 && response.statusCode! < 300) {
+        final data = response.data as Map<String, dynamic>;
+        final order = data['id'].toString();
 
         return PaymentResult(
             success: true, token: token, orderId: order, paymentKey: null);
       } else {
         throw Exception(
-            'Failed to authenticate. Status code: ${response.statusCode}');
+            'Failed to create order. Status code: ${response.statusCode}');
       }
     } catch (e) {
-      throw Exception('Error during authentication: $e');
+      throw Exception('Error during order creation: $e');
     }
   }
 
-  Future<PaymentResult> createPaymentKey({required String amount}) async {
+  Future<PaymentResult> createPaymentKey({
+    required String amount,
+    required Map<String, dynamic> billingData,
+  }) async {
     try {
-      final resultOfOrder = await createOrder(amount: '100');
+      final resultOfOrder = await createOrder(
+        amountCents: (double.parse(amount) * 100).toString(),
+      );
       final token = resultOfOrder.token;
       final orderId = resultOfOrder.orderId;
-      final url = Uri.parse('$baseUrl/acceptance/payment_keys');
-      final body = json.encode({
-        "auth_token": token,
-        "amount_cents": amount * 100,
-        "expiration": 3600,
-        "order_id": "103",
-        "billing_data": {
-          "apartment": "803",
-          "email": "claudette09@exa.com",
-          "floor": "42",
-          "first_name": "Clifford",
-          "street": "Ethan Land",
-          "building": "8028",
-          "phone_number": "+86(8)9135210487",
-          "shipping_method": "PKG",
-          "postal_code": "01898",
-          "city": "Jaskolskiburgh",
-          "country": "CR",
-          "last_name": "Nicolas",
-          "state": "Utah"
-        },
+
+      final paymentKeyData = {
+        "auth_token": token!,
+        "amount_cents": (double.parse(amount) * 100).toString(),
+        "expiration": 36000,
+        "order_id": orderId!,
+        "billing_data": billingData,
         "currency": "EGP",
-        "integration_id": 1,
-        "lock_order_when_paid": "false"
-      });
+        "integration_id": 4271664,
+        "lock_order_when_paid": "true",
+      };
 
-      final response = await http.post(url, body: body);
+      final response = await dio.post(
+          'https://accept.paymob.com/api/acceptance/payment_keys',
+          data: paymentKeyData);
 
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final paymentKey = data['token'];
+      if (response.statusCode! >= 200 && response.statusCode! < 300) {
+        final data = response.data as Map<String, dynamic>;
+        final paymentKey = data['token'].toString();
+
         return PaymentResult(
-            success: true,
-            token: token,
-            orderId: orderId,
-            paymentKey: paymentKey);
+          success: true,
+          token: token,
+          orderId: orderId,
+          paymentKey: paymentKey,
+        );
       } else {
         throw Exception(
-            'Failed to authenticate. Status code: ${response.statusCode}');
+            'Failed to create payment key. Status code: ${response.statusCode}');
       }
     } catch (e) {
-      throw Exception('Error during authentication: $e');
+      throw Exception('Error during payment key creation: $e');
     }
   }
 }
