@@ -1,6 +1,9 @@
 // ignore: file_names
+import 'package:ahgzly/pages/PayPage.dart';
+import 'package:ahgzly/services/PaymentService.dart';
 import 'package:flutter/material.dart';
 import 'package:ahgzly/models/Court.dart';
+import 'package:ahgzly/models/PaymentResult.dart';
 
 class CourtDetailPage extends StatelessWidget {
   final Court court;
@@ -59,8 +62,48 @@ class CourtDetailPage extends StatelessWidget {
       bottomNavigationBar: Container(
         padding: const EdgeInsets.all(16),
         child: ElevatedButton(
-          onPressed: () {
-            // Add reservation functionality here
+          onPressed: () async {
+            try {
+              final resp = await PaymentService().createPaymentKey(
+                amount: '400',
+                billingData: {
+                  "apartment": "80kkk3",
+                  "email": "claudetsdsdsdte09@exa.com",
+                  "floor": "52",
+                  "first_name": "Cliddffford",
+                  "street": "Ethan Land",
+                  "building": "8028",
+                  "phone_number": "+86(8)9135210aaa487",
+                  "shipping_method": "PKG",
+                  "postal_code": "01aaaa898",
+                  "city": "Jaskolskiburgh",
+                  "country": "CR",
+                  "last_name": "Nicolas",
+                  "state": "Utah",
+                },
+              );
+
+              if (resp.success != null) {
+                // Navigate to the reservations page
+                print('Payment key: ${resp.paymentKey}');
+                Navigator.of(context).push(MaterialPageRoute(
+                  builder: (context) => PayPage(
+                    token: resp.paymentKey!,
+                  ),
+                ));
+              } else {
+                // Handle the case where resp or resp.success is null
+                print('Payment response or success is null');
+              }
+            } catch (e) {
+              // Handle any exceptions that might occur during payment processing
+              print('Payment failed. Exception: $e');
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Payment failed. Please try again later.'),
+                ),
+              );
+            }
           },
           child: const Text('Reservations'),
         ),

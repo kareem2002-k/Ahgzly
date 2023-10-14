@@ -1,32 +1,28 @@
-import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:dio/dio.dart';
 import 'package:ahgzly/models/AuthenticationResponse.dart';
 import 'package:ahgzly/models/PaymentResult.dart';
 
 class PaymentService {
-  // ignore: constant_identifier_names
-  static const String api_key =
-      'ZXlKaGJHY2lPaUpJVXpVeE1pSXNJblI1Y0NJNklrcFhWQ0o5LmV5SmpiR0Z6Y3lJNklrMWxjbU5vWVc1MElpd2ljSEp2Wm1sc1pWOXdheUk2T1RJd016VTRMQ0p1WVcxbElqb2lNVFk1TnpBME5UYzBOeTQwTVRrM055SjkuZWZEa2VTTVlZSEZyQjRGZjc2SDBNN0FsY05KRVQ3aWxfVWUyXzBHY21ncUdFaG5jRmVHUHhGMm5iQk5SdXBvcTEwUmgyNWtBd1JrMG1tOXduMG9VaVE=';
-  static const String baseUrl = 'https://accept.paymob.com/api';
+  final Dio dio = Dio();
+  final String apiKey =
+      'ZXlKaGJHY2lPaUpJVXpVeE1pSXNJblI1Y0NJNklrcFhWQ0o5LmV5SmpiR0Z6Y3lJNklrMWxjbU5vWVc1MElpd2ljSEp2Wm1sc1pWOXdheUk2T1RJd016VTRMQ0p1WVcxbElqb2lNVFk1TnpJeE5qUTNNaTQ1TkRZek1EWWlmUS5CRlpKZHhJOWZvbjJWNGpycVMwT3QzbHdwaE5kYkh4eDZ4a2twTnJaV3pUNXM3WnFDanRmTzYzR1Ixdk52ZldrRFkxbFRtM0dVS3k2Z1JramEzSlpXZw==';
 
   Future<AuthenticationResponse> authenticate() async {
     try {
-      final url = Uri.parse('$baseUrl/auth/tokens');
-      final body = json.encode({
-        'api_key': api_key,
-      });
+      final response = await dio.post(
+          'https://accept.paymob.com/api/auth/tokens',
+          data: {"api_key": apiKey});
 
-      final response = await http.post(url, body: body);
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
+      if (response.statusCode! >= 200 && response.statusCode! < 300) {
+        final data = response.data as Map<String, dynamic>;
         final token = data['token'] as String;
-        // ignore: unnecessary_null_comparison
-        if (token != null) {
-          return AuthenticationResponse(token: token);
-        } else {
+
+        if (token == null) {
           throw Exception('Token not found in the response');
         }
+
+        return AuthenticationResponse(token: token);
       } else {
         throw Exception(
             'Failed to authenticate. Status code: ${response.statusCode}');
@@ -36,61 +32,84 @@ class PaymentService {
     }
   }
 
-  Future<PaymentResult> createOrder({required String amount}) async {
+  Future<PaymentResult> createOrder({
+    required String amountCents,
+    String currency = 'EGP',
+  }) async {
     try {
       final validatetok = await authenticate();
       final token = validatetok.token;
-      final url = Uri.parse('$baseUrl/ecommerce/orders');
-      final body = json.encode({
+
+      final body = {
         "auth_token": token,
         "delivery_needed": "false",
-        "amount_cents": "100",
-        "currency": "EGP",
-        "merchant_order_id": 5,
+        "amount_cents": amountCents,
+        "currency": currency,
         "items": [],
-        "shipping_data": {
-          "apartment": "803",
-          "email": "claudette09@exa.com",
-          "floor": "42",
-          "first_name": "Clifford",
-          "street": "Ethan Land",
-          "building": "8028",
-          "phone_number": "+86(8)9135210487",
-          "postal_code": "01898",
-          "extra_description": "8 Ram , 128 Giga",
-          "city": "Jaskolskiburgh",
-          "country": "CR",
-          "last_name": "Nicolas",
-          "state": "Utah"
-        },
-        "shipping_details": {
-          "notes": " test",
-          "number_of_packages": 1,
-          "weight": 1,
-          "weight_unit": "Kilogram",
-          "length": 1,
-          "width": 1,
-          "height": 1,
-          "contents": "product of some sorts"
-        }
-      });
+      };
 
-      final response = await http.post(url, body: body);
+      final response = await dio.post(
+        'https://accept.paymob.com/api/ecommerce/orders',
+        data: body,
+      );
 
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final order = data['id'];
+      if (response.statusCode! >= 200 && response.statusCode! < 300) {
+        final data = response.data as Map<String, dynamic>;
+        final order = data['id'].toString();
+
+        return PaymentResult(
+            success: true, token: token, orderId: order, paymentKey: null);
+      } else {
+        throw Exception(
+            'Failed to create order. Status code: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error during order creation: $e');
+    }
+  }
+
+  Future<PaymentResult> createPaymentKey({
+    required String amount,
+    required Map<String, dynamic> billingData,
+  }) async {
+    try {
+      final resultOfOrder = await createOrder(
+        amountCents: (double.parse(amount) * 100).toString(),
+      );
+      final token = resultOfOrder.token;
+      final orderId = resultOfOrder.orderId;
+
+      final paymentKeyData = {
+        "auth_token": token!,
+        "amount_cents": (double.parse(amount) * 100).toString(),
+        "expiration": 36000,
+        "order_id": orderId!,
+        "billing_data": billingData,
+        "currency": "EGP",
+        "integration_id": 4271664,
+        "lock_order_when_paid": "true",
+      };
+
+      final response = await dio.post(
+          'https://accept.paymob.com/api/acceptance/payment_keys',
+          data: paymentKeyData);
+
+      if (response.statusCode! >= 200 && response.statusCode! < 300) {
+        final data = response.data as Map<String, dynamic>;
+        final paymentKey = data['token'].toString();
+
         return PaymentResult(
           success: true,
           token: token,
-          orderId: order,
+          orderId: orderId,
+          paymentKey: paymentKey,
         );
       } else {
         throw Exception(
-            'Failed to authenticate. Status code: ${response.statusCode}');
+            'Failed to create payment key. Status code: ${response.statusCode}');
       }
     } catch (e) {
-      throw Exception('Error during authentication: $e');
+      throw Exception('Error during payment key creation: $e');
     }
   }
 }
